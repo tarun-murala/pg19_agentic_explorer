@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, List
 
 import httpx
 
@@ -15,6 +15,18 @@ class LLMRequest:
 @dataclass
 class LLMResponse:
     output: str
+    raw: Dict[str, Any]
+
+
+@dataclass
+class EmbeddingRequest:
+    prompt: str
+    model: str = "nomic-embed-text"
+
+
+@dataclass
+class EmbeddingResponse:
+    embedding: List[float]
     raw: Dict[str, Any]
 
 
@@ -38,3 +50,21 @@ class LLMClient:
         response.raise_for_status()
         data = response.json()
         return LLMResponse(output=data.get("response", ""), raw=data)
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        payload = {
+            "model": request.model,
+            "prompt": request.prompt,
+        }
+        response = self._client.post("/api/embeddings", json=payload, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        embedding = data.get("embedding") or data.get("data", [{}])[0].get("embedding", [])
+        return EmbeddingResponse(embedding=list(embedding), raw=data)
+
+    def embed_batch(self, prompts: Iterable[str], model: str | None = None) -> List[List[float]]:
+        vectors: List[List[float]] = []
+        for prompt in prompts:
+            response = self.embed(EmbeddingRequest(prompt=prompt, model=model or "nomic-embed-text"))
+            vectors.append(response.embedding)
+        return vectors

@@ -5,6 +5,7 @@ from sqlmodel import select
 
 from .config import get_settings
 from .db import get_session, init_db
+from .embeddings import EmbeddingService
 from .ingestor import PG19BookIngestor
 from .models import Book, Chunk
 from .schemas import (
@@ -12,13 +13,21 @@ from .schemas import (
     BookRead,
     ChunkDetail,
     ChunkSummary,
+    IndexBookRequest,
+    IndexBookResponse,
     IngestBookRequest,
+    RAGChunkResult,
+    RAGQueryRequest,
+    RAGQueryResponse,
 )
 from .serializers import to_book_read, to_chunk_detail, to_chunk_summary
+from .vector_store import VectorStore
 
 app = FastAPI(title="PG19 Ingestion Service")
 settings = get_settings()
 ingestor = PG19BookIngestor(settings=settings)
+embedding_service = EmbeddingService(settings=settings)
+vector_store = VectorStore(settings=settings)
 
 
 @app.on_event("startup")
@@ -88,3 +97,45 @@ async def get_book_chunks(
         )
         chunks = session.exec(statement).all()
         return [to_chunk_detail(chunk) for chunk in chunks]
+
+
+@app.post("/vector/index", response_model=IndexBookResponse, summary="Embed and index all chunks for a book")
+async def index_book(request: IndexBookRequest) -> IndexBookResponse:
+    with get_session() as session:
+        book = session.get(Book, request.book_id)
+        if not book:
+            raise HTTPException(status_code=404, detail="Book not found")
+        book_id = book.id
+        statement = select(Chunk).where(Chunk.book_id == book_id).order_by(Chunk.chunk_index)
+        chunks = session.exec(statement).all()
+        if not chunks:
+            raise HTTPException(status_code=400, detail="Book has no chunks to index")
+
+    if request.reindex:
+        vector_store.delete_book(book_id)
+
+    embeddings = embedding_service.embed_texts(chunk.content for chunk in chunks)
+    vector_store.upsert_chunks(chunks, embeddings)
+    return IndexBookResponse(book_id=book_id, chunks_indexed=len(chunks))
+
+
+@app.post("/rag/query", response_model=RAGQueryResponse, summary="Query vector store for top-k chunks")
+async def rag_query(request: RAGQueryRequest) -> RAGQueryResponse:
+    query_vector = embedding_service.embed_text(request.query)
+    top_k = request.top_k or settings.rag_top_k
+    search_results = vector_store.search(query_vector, top_k)
+
+    rag_results: List[RAGChunkResult] = []
+    for point in search_results:
+        payload = point.payload or {}
+        chunk = ChunkDetail(
+            id=int(payload.get("chunk_id") or point.id),
+            book_id=int(payload.get("book_id")),
+            chunk_index=int(payload.get("chunk_index")),
+            start_char=int(payload.get("start_char")),
+            end_char=int(payload.get("end_char")),
+            content=payload.get("content", ""),
+        )
+        rag_results.append(RAGChunkResult(chunk=chunk, score=float(point.score)))
+
+    return RAGQueryResponse(query=request.query, results=rag_results)

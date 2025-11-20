@@ -7,3 +7,4 @@ sqlmodel
 sqlalchemy
 python-dotenv
 psycopg[binary]
+qdrant-client

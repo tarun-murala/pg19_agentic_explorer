@@ -19,21 +19,38 @@ services:
 
   ingestion-service:
     build:
-      context: ./services/ingestion_service
+      context: .
+      dockerfile: services/ingestion_service/Dockerfile
     container_name: pg19_ingestion_service
     depends_on:
       ingestion-db:
         condition: service_healthy
+      qdrant:
+        condition: service_started
     env_file:
       - services/ingestion_service/.env.example
     environment:
       INGESTION_DATABASE_URL: postgresql+psycopg://pg19:pg19pass@ingestion-db:5432/pg19_ingestion
       INGESTION_PG19_ROOT: /data/pg19
+      INGESTION_VECTOR_HOST: qdrant
+      INGESTION_VECTOR_PORT: 6333
+      INGESTION_OLLAMA_BASE_URL: http://host.docker.internal:11434
     volumes:
       - ./data/pg19:/data/pg19:ro
     ports:
       - "8001:8001"
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:v1.10.0
+    container_name: pg19_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
 volumes:
   pg19_ingestion_data:
+  qdrant_data:

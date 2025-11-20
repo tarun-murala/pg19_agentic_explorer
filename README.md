@@ -23,7 +23,7 @@ docs/
 ## Getting started
 
 1. Ensure Python 3.11+ and Node 18+ are installed locally along with Docker/Qdrant/Neo4j as needed.
-2. Launch shared infrastructure with `docker compose up -d ingestion-db ingestion-service` (brings up Postgres plus the ingestion API container; more services will be added later).
+2. Launch shared infrastructure with `docker compose up -d ingestion-db qdrant ingestion-service` (brings up Postgres, Qdrant, and the ingestion/vector API container; more services will be added later).
 3. Install per-service dependencies (see each service README) and run them individually during development.
 4. Use `.env` files per service (templates provided inside each service directory) to configure Postgres, Qdrant/Chroma, Neo4j, and the Ollama base URL.
 

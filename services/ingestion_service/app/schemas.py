@@ -47,3 +47,28 @@ class BookIngestionResponse(BaseModel):
 
 class ChunkDetail(ChunkSummary):
     content: str
+
+
+class IndexBookRequest(BaseModel):
+    book_id: int
+    reindex: bool = False
+
+
+class RAGQueryRequest(BaseModel):
+    query: str
+    top_k: int | None = None
+
+
+class RAGChunkResult(BaseModel):
+    chunk: ChunkDetail
+    score: float
+
+
+class IndexBookResponse(BaseModel):
+    book_id: int
+    chunks_indexed: int
+
+
+class RAGQueryResponse(BaseModel):
+    query: str
+    results: List[RAGChunkResult]

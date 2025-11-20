@@ -5,16 +5,20 @@ FastAPI microservice that ingests PG-19 texts from disk, normalizes metadata, ch
 ## Dev setup
 
 ```bash
-# boot Postgres for metadata storage (from repo root)
-docker compose up -d ingestion-db
+# boot Postgres + Qdrant for metadata/vector storage (from repo root)
+docker compose up -d ingestion-db qdrant
 
 cd services/ingestion_service
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e ../../shared/clients/llm_client
 cp .env.example .env  # edit values if needed
+export PYTHONPATH=$(git rev-parse --show-toplevel)
 uvicorn app.main:app --reload --port 8001
 ```
+
+Ensure `ollama` is running locally and the configured embedding model (default `nomic-embed-text`) is available (`ollama pull nomic-embed-text`).
 
 ### Running via Docker Compose
 
@@ -35,8 +39,14 @@ Environment variables (prefix `INGESTION_`) control runtime settings (see `.env.
 | `PG19_ROOT` | Directory containing PG-19 `.txt` files | `./data/pg19` |
 | `CHUNK_SIZE` | Character length per chunk | `1200` |
 | `CHUNK_OVERLAP` | Character overlap between chunks | `200` |
+| `EMBEDDING_MODEL` | Ollama embedding model name | `nomic-embed-text` |
+| `VECTOR_HOST` | Qdrant host | `localhost` |
+| `VECTOR_PORT` | Qdrant REST port | `6333` |
+| `VECTOR_COLLECTION` | Qdrant collection name | `pg19_chunks` |
+| `RAG_TOP_K` | Default top-k for `/rag/query` | `5` |
+| `OLLAMA_BASE_URL` | Base URL for Ollama runtime | `http://localhost:11434` |
 
-> When running via Docker Compose the service overrides `INGESTION_DATABASE_URL` to target the `ingestion-db` container and `INGESTION_PG19_ROOT` to `/data/pg19` (mounted from `./data/pg19`).
+> When running via Docker Compose the service overrides DB + vector env vars to talk to the `ingestion-db` (Postgres) and `qdrant` containers and maps `INGESTION_PG19_ROOT` to `/data/pg19` (mounted from `./data/pg19`).
 
 ## REST surface
 
@@ -44,6 +54,8 @@ Environment variables (prefix `INGESTION_`) control runtime settings (see `.env.
 - `GET /books` – list most recent books.
 - `GET /books/{book_id}` – fetch normalized metadata for a book.
 - `GET /books/{book_id}/chunks` – paginated chunk metadata + content for debugging.
+- `POST /vector/index` – body `{ "book_id": 1, "reindex": false }`. Embeds every chunk with the configured Ollama model and upserts them into Qdrant.
+- `POST /rag/query` – body `{ "query": "...", "top_k": 5 }`. Embeds the query and returns the highest scoring chunks from Qdrant.
 
 ## Book & Chunk schema
 
@@ -85,3 +97,29 @@ curl -X POST http://localhost:8001/ingest/book \
 ```
 
 3. Inspect stored metadata via `GET /books` or `GET /books/{id}/chunks`.
+
+## Vector indexing & RAG queries
+
+1. Ensure `ollama` is running locally with an embedding-capable model (e.g. `nomic-embed-text`):
+
+```bash
+ollama pull nomic-embed-text
+```
+
+2. Index a book's chunks into Qdrant:
+
+```bash
+curl -X POST http://localhost:8001/vector/index \
+  -H 'content-type: application/json' \
+  -d '{"book_id": 1, "reindex": true}'
+```
+
+3. Run a quick RAG-style search:
+
+```bash
+curl -X POST http://localhost:8001/rag/query \
+  -H 'content-type: application/json' \
+  -d '{"query": "How does the protagonist escape?", "top_k": 3}'
+```
+
+The `/rag/query` response returns chunk metadata/content plus cosine similarity scores; downstream services can feed this into answer-generation agents.

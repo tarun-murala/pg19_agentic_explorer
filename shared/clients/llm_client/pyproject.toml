@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pg19-llm-client"
+version = "0.1.0"
+description = "Thin Ollama LLM client for PG19-Agentic-Explorer"
+authors = [{name = "PG19-Agentic-Explorer"}]
+requires-python = ">=3.10"
+dependencies = ["httpx"]
+
+[project.optional-dependencies]
+tests = []
