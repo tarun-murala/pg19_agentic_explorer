@@ -1,0 +1,39 @@
+services:
+  ingestion-db:
+    image: postgres:15
+    container_name: pg19_ingestion_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pg19_ingestion
+      POSTGRES_USER: pg19
+      POSTGRES_PASSWORD: pg19pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg19_ingestion_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg19 -d pg19_ingestion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ingestion-service:
+    build:
+      context: ./services/ingestion_service
+    container_name: pg19_ingestion_service
+    depends_on:
+      ingestion-db:
+        condition: service_healthy
+    env_file:
+      - services/ingestion_service/.env.example
+    environment:
+      INGESTION_DATABASE_URL: postgresql+psycopg://pg19:pg19pass@ingestion-db:5432/pg19_ingestion
+      INGESTION_PG19_ROOT: /data/pg19
+    volumes:
+      - ./data/pg19:/data/pg19:ro
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+volumes:
+  pg19_ingestion_data:
