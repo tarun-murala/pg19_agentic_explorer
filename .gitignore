@@ -1,0 +1,13 @@
+# datasets
+/data/pg19
+/data/pg19_hf
+/data/pg19_train_hf
+/data/orchestrator
+
+# python envs
+**/.venv
+
+# node
+services/ui/.next
+services/ui/node_modules
+services/ui/.env.local

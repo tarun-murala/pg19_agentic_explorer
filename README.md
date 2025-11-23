@@ -23,8 +23,19 @@ docs/
 ## Getting started
 
 1. Ensure Python 3.11+ and Node 18+ are installed locally along with Docker/Qdrant/Neo4j as needed.
-2. Launch shared infrastructure with `docker compose up -d ingestion-db qdrant ingestion-service` (brings up Postgres, Qdrant, and the ingestion/vector API container; more services will be added later).
+2. Launch shared infrastructure with `docker compose up -d ingestion-db qdrant ingestion-service orchestrator-service ui-service` (brings up Postgres, Qdrant, ingestion/vector API, orchestrator, and the Next.js UI). Ensure `./data/pg19` contains PG-19 texts and `./data/orchestrator` exists for trace persistence.
 3. Install per-service dependencies (see each service README) and run them individually during development.
 4. Use `.env` files per service (templates provided inside each service directory) to configure Postgres, Qdrant/Chroma, Neo4j, and the Ollama base URL.
+
+### Exporting PG-19 from Hugging Face shards
+
+If you downloaded the dataset via `datasets.save_to_disk`, convert it into plain `.txt` files for the ingestion service using:
+
+```bash
+pip install datasets
+python scripts/export_pg19_from_hf.py data/pg19_train_hf data/pg19
+```
+
+Optional: `--limit 10` to export a subset for smoke tests. The script writes Gutenberg-style headers and book text into `data/pg19/*.txt` so the ingestion service can pick them up.
 
 Detailed component responsibilities and data flow diagrams live in [`ARCHITECTURE.md`](ARCHITECTURE.md).

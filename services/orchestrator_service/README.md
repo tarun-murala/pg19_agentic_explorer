@@ -1,6 +1,6 @@
 # Agent Orchestrator Service
 
-Front-door FastAPI API that coordinates four agents (Analyzer, RAG Retrieval, KG Context, and Answer Generator) to answer chat-style queries using the PG-19 knowledge base.
+Front-door FastAPI API that coordinates four agents (Analyzer, RAG Retrieval, KG Context, and Answer Generator) to answer chat-style queries using the PG-19 knowledge base. The service persists conversation history + traces and exposes streaming endpoints for real-time UI updates.
 
 ## Dev setup
 
@@ -14,9 +14,11 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Pre-reqs:
-- Ingestion/vector service running (`http://localhost:8001`) to serve `/rag/query`.
-- KG builder service running (`http://localhost:8002`) to serve `/kg/entities`.
+To run via Docker Compose (with dependencies), use `docker compose up -d orchestrator-service` from the repo root.
+
+### Pre-reqs
+- Ingestion/vector service (`http://localhost:8001`) exposing `/rag/query`.
+- KG builder service (`http://localhost:8002`) exposing `/kg/entities`.
 - Local `ollama` runtime with the configured model (default `codellama:latest`).
 
 ## Configuration
@@ -28,44 +30,33 @@ Pre-reqs:
 | `ORCH_LLM_MODEL` | Ollama model used by Analyzer + Answer agents | `codellama:latest` |
 | `ORCH_OLLAMA_BASE_URL` | Ollama HTTP endpoint | `http://localhost:11434` |
 | `ORCH_RAG_TOP_K` | Default chunk count for retrieval | `4` |
+| `ORCH_HISTORY_PATH` | JSON file used to persist history/traces | `data/orchestrator_history.json` |
 
-## API
+## API surface
 
-`POST /chat/query`
+| Endpoint | Description |
+| --- | --- |
+| `POST /chat/query` | Runs the full agent pipeline and returns the answer, citations, trace, and `conversation_id`. |
+| `POST /chat/query/stream` | Server-sent events stream delivering per-agent trace steps followed by the final payload. |
+| `GET /history?limit=20` | Lists recent conversation summaries from the persisted history store. |
+| `GET /trace/{trace_id}` | Downloads the full trace (as JSON) for a historical conversation. |
+| `GET /health` | Basic service healthcheck. |
+
+`/chat/query/stream` emits events shaped as:
 
 ```jsonc
-{
-  "question": "How does the narrator describe the city?",
-  "top_k": 4
-}
+{ "type": "step", "payload": TraceStep }
+{ "type": "final", "payload": ChatQueryResponse }
+{ "type": "error", "message": "..." }
 ```
 
-Response:
-
-```jsonc
-{
-  "answer": "...",
-  "citations": [34, 35],
-  "trace": [
-    {
-      "agent": "AnalyzerAgent",
-      "input": {"question": "..."},
-      "output": {"intent": "analyze", "entities": ["city"], "detail_level": "medium"},
-      "started_at": "2024-05-22T12:00:00Z",
-      "finished_at": "2024-05-22T12:00:01Z"
-    },
-    ...
-  ]
-}
-```
-
-Trace steps expose the inputs/outputs per agent so the UI can visualize the orchestration flow end-to-end.
+This allows the UI to render partial results while the analyzer/retriever/KG/answer agents finish.
 
 ## Agent flow
 
-1. **Analyzer Agent** – categorizes the question, extracts named entities, and infers desired detail level with an LLM prompt.
-2. **RAG Retrieval Agent** – calls the ingestion service `/rag/query` endpoint to fetch the top-k scored chunks.
-3. **KG Context Agent** – queries the KG builder for entities/relations related to the retrieved chunk(s) (prefers chunk scope, falls back to book scope).
-4. **Answer Agent** – synthesizes the final answer using chunk content + KG hints via the LLM, returning answer text + chunk ID citations.
+1. **Analyzer Agent** – LLM prompt that infers intent, relevant entities, and required detail level.
+2. **RAG Retrieval Agent** – Calls ingestion `/rag/query` to grab the top-k scored chunks.
+3. **KG Context Agent** – Queries the KG builder for entities/relations tied to the retrieved chunk/book ids.
+4. **Answer Agent** – Synthesizes the final response with chunk context + KG hints; returns answer text + chunk citations.
 
-The orchestrator stitches these agents in sequence and returns the full trace for observability.
+Each agent produces a structured `TraceStep` that is persisted alongside the conversation, powering downloadable traces and detailed UI timelines.

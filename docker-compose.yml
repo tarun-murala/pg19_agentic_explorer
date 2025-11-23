@@ -41,6 +41,45 @@ services:
       - "8001:8001"
     restart: unless-stopped
 
+  orchestrator-service:
+    build:
+      context: .
+      dockerfile: services/orchestrator_service/Dockerfile
+    container_name: pg19_orchestrator_service
+    depends_on:
+      ingestion-service:
+        condition: service_started
+    env_file:
+      - services/orchestrator_service/.env.example
+    environment:
+      ORCH_INGESTION_SERVICE_URL: http://ingestion-service:8001
+      ORCH_KG_SERVICE_URL: http://host.docker.internal:8002
+      ORCH_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      ORCH_HISTORY_PATH: /data/orchestrator_history.json
+    volumes:
+      - ./data/orchestrator:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  ui-service:
+    build:
+      context: .
+      dockerfile: services/ui/Dockerfile
+    container_name: pg19_ui
+    depends_on:
+      orchestrator-service:
+        condition: service_started
+    environment:
+      ORCHESTRATOR_URL: http://orchestrator-service:8000
+      DATASET_DIR: /data/pg19
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./data:/data
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
   qdrant:
     image: qdrant/qdrant:v1.10.0
     container_name: pg19_qdrant

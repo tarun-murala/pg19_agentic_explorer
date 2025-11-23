@@ -4,4 +4,3 @@ httpx
 pydantic
 pydantic-settings
 python-dotenv
--e ../../shared/clients/llm_client

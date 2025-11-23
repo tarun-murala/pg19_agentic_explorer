@@ -84,6 +84,24 @@ class ChatQueryRequest(BaseModel):
 
 
 class ChatQueryResponse(BaseModel):
+    conversation_id: str
     answer: str
     trace: List[TraceStep]
     citations: List[int]
+
+
+class HistoryEntry(BaseModel):
+    id: str
+    question: str
+    answer: str
+    citations: List[int]
+    trace: List[TraceStep]
+    created_at: datetime
+
+
+class HistorySummary(BaseModel):
+    id: str
+    question: str
+    answer: str
+    citations: List[int]
+    created_at: datetime
