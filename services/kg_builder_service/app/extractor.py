@@ -11,14 +11,24 @@ from .config import Settings, get_settings
 from .schemas import Entity, Relation
 
 _PROMPT_TEMPLATE = """
-You are an expert literary analyst that produces structured knowledge graphs.
-Given a book chunk (with title and chunk index), identify up to {max_entities} key named entities and any explicit
-relationships between them. Use concise names and categorize the entity type (person, location, object, event, other).
+You are an expert literary analyst building a knowledge graph from a single chunk of text.
 
-Return JSON with the following shape:
+Rules:
+- Extract up to {max_entities} salient, named entities actually present in the chunk. Do not invent entities.
+- Entity types: person | organization | location | object | event | other.
+- Use short, canonical names (no pronouns), and include a brief description grounded in the chunk.
+- Include aliases only if explicitly stated; otherwise use an empty list.
+- Relations must only reference entities you extracted. Do not add relations if unsure.
+- If nothing clear is present, return empty arrays.
+
+Return ONLY JSON (no prose, no code fences) with this exact shape:
 {{
-  "entities": [{{"name": "...", "type": "person", "description": "...", "aliases": ["..."]}}],
-  "relations": [{{"source": "Entity Name", "target": "Entity Name", "type": "relationship", "description": "..."}}]
+  "entities": [
+    {{"name": "Entity Name", "type": "person", "description": "who/what it is per the chunk", "aliases": []}}
+  ],
+  "relations": [
+    {{"source": "Entity Name", "target": "Entity Name", "type": "relationship", "description": "relation described in the chunk"}}
+  ]
 }}
 
 Chunk metadata:
@@ -27,8 +37,6 @@ Chunk metadata:
 
 Chunk content:
 {chunk}
-
-Respond with ONLY the JSON.
 """
 
 

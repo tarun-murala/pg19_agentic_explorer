@@ -82,6 +82,10 @@ export default function HomePage() {
   const [turns, setTurns] = useState<ConversationTurn[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadDetails, setUploadDetails] = useState<any | null>(null)
 
   useEffect(() => {
     setLoadingHistory(true)
@@ -240,6 +244,28 @@ export default function HomePage() {
     }
   }
 
+  const handleUpload = async (file: File) => {
+    setUploading(true)
+    setUploadError(null)
+    setUploadMessage(null)
+    setUploadDetails(null)
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Upload failed')
+      }
+      setUploadMessage(`Ingested ${file.name}`)
+      setUploadDetails(data.ingestion)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
       <header className="rounded-3xl bg-white p-6 shadow-sm">
@@ -254,6 +280,44 @@ export default function HomePage() {
       <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
         <div className="space-y-4">
           <DatasetStatus />
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <header className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-brand-600">Upload & Ingest</p>
+                <p className="text-xs text-slate-500">Upload a PG-19 .txt file to trigger ingestion.</p>
+              </div>
+            </header>
+            <div className="mt-3 space-y-2 text-sm text-slate-700">
+              <label
+                className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-dashed border-slate-300 px-3 py-3 text-sm font-semibold text-slate-700 hover:border-brand-200"
+              >
+                <span>{uploading ? 'Uploading…' : 'Choose a .txt file'}</span>
+                <input
+                  type="file"
+                  accept=".txt"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      handleUpload(file)
+                      e.target.value = ''
+                    }
+                  }}
+                />
+              </label>
+              {uploadMessage && <p className="text-emerald-600">{uploadMessage}</p>}
+              {uploadDetails && (
+                <p className="text-xs text-slate-500">
+                  Book #{uploadDetails?.book?.id}: {uploadDetails?.book?.title} ({uploadDetails?.chunks?.length || 0} chunks)
+                </p>
+              )}
+              {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+              <p className="text-xs text-slate-500">
+                Files are stored in the shared dataset directory and sent to the ingestion service automatically.
+              </p>
+            </div>
+          </section>
           <ChatPanel onSubmit={handleSubmit} disabled={isRunning} />
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
             <header className="flex items-center justify-between">

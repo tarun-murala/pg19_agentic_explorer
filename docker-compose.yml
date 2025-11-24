@@ -94,6 +94,7 @@ services:
     environment:
       ORCHESTRATOR_URL: http://orchestrator-service:8000
       DATASET_DIR: /data/pg19
+      INGESTION_URL: http://ingestion-service:8001
       NEXT_TELEMETRY_DISABLED: "1"
     volumes:
       - ./data:/data
