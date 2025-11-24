@@ -19,7 +19,8 @@ To run via Docker Compose (with dependencies), use `docker compose up -d orchest
 ### Pre-reqs
 - Ingestion/vector service (`http://localhost:8001`) exposing `/rag/query`.
 - KG builder service (`http://localhost:8002`) exposing `/kg/entities`.
-- Local `ollama` runtime with the configured model (default `codellama:latest`).
+- Local `ollama` runtime with the configured model (default `codellama:7b`).
+  - Pull it with `ollama pull codellama:7b` or set `ORCH_LLM_MODEL` to a model you already have locally.
 
 ## Configuration
 
@@ -27,8 +28,8 @@ To run via Docker Compose (with dependencies), use `docker compose up -d orchest
 | --- | --- | --- |
 | `ORCH_INGESTION_SERVICE_URL` | Base URL for ingestion/vector API | `http://localhost:8001` |
 | `ORCH_KG_SERVICE_URL` | Base URL for KG builder API | `http://localhost:8002` |
-| `ORCH_LLM_MODEL` | Ollama model used by Analyzer + Answer agents | `codellama:latest` |
-| `ORCH_OLLAMA_BASE_URL` | Ollama HTTP endpoint | `http://localhost:11434` |
+| `ORCH_LLM_MODEL` | Ollama model used by Analyzer + Answer agents | `codellama:7b` |
+| `ORCH_OLLAMA_BASE_URL` | Ollama HTTP endpoint | `http://localhost:11434` (Docker: `http://host.docker.internal:11434`) |
 | `ORCH_RAG_TOP_K` | Default chunk count for retrieval | `4` |
 | `ORCH_HISTORY_PATH` | JSON file used to persist history/traces | `data/orchestrator_history.json` |
 

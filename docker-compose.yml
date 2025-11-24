@@ -62,6 +62,25 @@ services:
       - "8000:8000"
     restart: unless-stopped
 
+  kg-builder-service:
+    build:
+      context: .
+      dockerfile: services/kg_builder_service/Dockerfile
+    container_name: pg19_kg_builder
+    env_file:
+      - services/kg_builder_service/.env.example
+    environment:
+      KG_NEO4J_URI: bolt://neo4j:7687
+      KG_OLLAMA_BASE_URL: http://host.docker.internal:11434
+    depends_on:
+      neo4j:
+        condition: service_started
+      orchestrator-service:
+        condition: service_started
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+
   ui-service:
     build:
       context: .
@@ -69,6 +88,8 @@ services:
     container_name: pg19_ui
     depends_on:
       orchestrator-service:
+        condition: service_started
+      kg-builder-service:
         condition: service_started
     environment:
       ORCHESTRATOR_URL: http://orchestrator-service:8000
@@ -90,6 +111,19 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  neo4j:
+    image: neo4j:5.21
+    container_name: pg19_neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/password
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
 volumes:
   pg19_ingestion_data:
   qdrant_data:
+  neo4j_data:

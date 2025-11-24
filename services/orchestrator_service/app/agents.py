@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List
 
 import httpx
+import logging
 
 from shared.clients.llm_client import LLMClient, LLMRequest
 
@@ -28,14 +29,16 @@ class AnalyzerAgent:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.llm = LLMClient(base_url=self.settings.ollama_base_url)
+        self.logger = logging.getLogger("orchestrator.analyzer")
 
-    def run(self, payload: AnalyzerInput) -> AnalyzerOutput:
+    def run(self, payload: AnalyzerInput, trace_id: str | None = None) -> AnalyzerOutput:
         prompt = (
             "You analyze literary questions. Identify the primary intent (summarize, analyze, compare, fact-check, other), "
             "list key named entities mentioned, and the desired detail level (short, medium, in-depth).\n"
             f"Question: {payload.question}\n"
             "Return JSON as {\"intent\":str, \"entities\":[], \"detail_level\":str}."
         )
+        self.logger.info("AnalyzerAgent LLM call", extra={"trace_id": trace_id})
         response = self.llm.generate(
             LLMRequest(prompt=prompt, model=self.settings.llm_model, temperature=0.1, max_tokens=256)
         )
@@ -66,12 +69,19 @@ class RAGRetrievalAgent:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.client = httpx.Client(base_url=self.settings.ingestion_service_url)
+        self.logger = logging.getLogger("orchestrator.rag")
 
-    def run(self, payload: RAGRetrievalInput) -> RAGRetrievalOutput:
+    def run(self, payload: RAGRetrievalInput, trace_id: str | None = None) -> RAGRetrievalOutput:
+        headers = {"x-trace-id": trace_id} if trace_id else None
+        self.logger.info(
+            "RAGRetrievalAgent request",
+            extra={"trace_id": trace_id, "top_k": payload.top_k},
+        )
         resp = self.client.post(
             "/rag/query",
             json={"query": payload.question, "top_k": payload.top_k},
             timeout=60,
+            headers=headers,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -94,8 +104,9 @@ class KGContextAgent:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.client = httpx.Client(base_url=self.settings.kg_service_url)
+        self.logger = logging.getLogger("orchestrator.kg")
 
-    def run(self, payload: KGContextInput) -> KGContextOutput:
+    def run(self, payload: KGContextInput, trace_id: str | None = None) -> KGContextOutput:
         params = {}
         if payload.chunk_ids:
             params["chunk_id"] = payload.chunk_ids[0]
@@ -103,7 +114,12 @@ class KGContextAgent:
             params["book_id"] = payload.book_ids[0]
         else:
             return KGContextOutput(entities=[], relations=[])
-        resp = self.client.get("/kg/entities", params=params, timeout=60)
+        headers = {"x-trace-id": trace_id} if trace_id else None
+        self.logger.info(
+            "KGContextAgent request",
+            extra={"trace_id": trace_id, "params": params},
+        )
+        resp = self.client.get("/kg/entities", params=params, timeout=60, headers=headers)
         if resp.status_code == 400:
             return KGContextOutput(entities=[], relations=[])
         resp.raise_for_status()
@@ -117,8 +133,9 @@ class AnswerAgent:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.llm = LLMClient(base_url=self.settings.ollama_base_url)
+        self.logger = logging.getLogger("orchestrator.answer")
 
-    def run(self, payload: AnswerAgentInput) -> AnswerAgentOutput:
+    def run(self, payload: AnswerAgentInput, trace_id: str | None = None) -> AnswerAgentOutput:
         citations = [chunk.chunk_id for chunk in payload.rag_chunks]
         context_blocks = []
         for idx, chunk in enumerate(payload.rag_chunks, 1):
@@ -136,6 +153,10 @@ class AnswerAgent:
             f"KG Entities: {kg_entities}\n"
             f"KG Relations: {kg_relations}\n"
             "Answer:"
+        )
+        self.logger.info(
+            "AnswerAgent LLM call",
+            extra={"trace_id": trace_id, "citations": citations},
         )
         response = self.llm.generate(
             LLMRequest(prompt=prompt, model=self.settings.llm_model, temperature=0.2, max_tokens=512)

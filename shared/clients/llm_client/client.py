@@ -7,7 +7,7 @@ import httpx
 @dataclass
 class LLMRequest:
     prompt: str
-    model: str = "codellama:latest"
+    model: str = "codellama:7b"
     temperature: float = 0.1
     max_tokens: int = 512
 
@@ -41,6 +41,8 @@ class LLMClient:
         payload = {
             "model": request.model,
             "prompt": request.prompt,
+            # Use non-streaming responses so we can parse JSON in one shot
+            "stream": False,
             "options": {
                 "temperature": request.temperature,
                 "num_predict": request.max_tokens,

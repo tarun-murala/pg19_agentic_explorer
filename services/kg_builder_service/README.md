@@ -16,7 +16,8 @@ uvicorn app.main:app --reload --port 8002
 
 Ensure you have:
 - A running Neo4j instance (e.g., `docker run -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:5.21`).
-- `ollama` running locally with the configured extraction model (default `codellama:latest`).
+- `ollama` running locally with the configured extraction model (default `codellama:7b`).
+  - If you haven't pulled the model yet, run `ollama pull codellama:7b` (or update `KG_LLM_MODEL` to whatever you already have installed).
 
 ## Configuration
 
@@ -27,8 +28,8 @@ Environment variables (prefix `KG_`, see `.env.example`):
 | `NEO4J_URI` | Bolt connection URI | `bolt://localhost:7687` |
 | `NEO4J_USER` | Neo4j username | `neo4j` |
 | `NEO4J_PASSWORD` | Neo4j password | `password` |
-| `LLM_MODEL` | Ollama model to use for extraction | `codellama:latest` |
-| `OLLAMA_BASE_URL` | Ollama HTTP endpoint | `http://localhost:11434` |
+| `LLM_MODEL` | Ollama model to use for extraction | `codellama:7b` |
+| `OLLAMA_BASE_URL` | Ollama HTTP endpoint | `http://localhost:11434` (Docker: `http://host.docker.internal:11434`) |
 | `MAX_ENTITIES` | Hint to LLM for entity cap per chunk | `10` |
 
 ## REST surface

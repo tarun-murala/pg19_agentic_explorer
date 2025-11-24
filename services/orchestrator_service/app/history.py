@@ -28,7 +28,7 @@ class HistoryStore:
 
     def _persist(self) -> None:
         data = [entry.model_dump() for entry in self._entries]
-        self._path.write_text(json.dumps(data, indent=2))
+        self._path.write_text(json.dumps(data, indent=2, default=str))
 
     def add_entry(
         self,

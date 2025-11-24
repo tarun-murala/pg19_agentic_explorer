@@ -26,6 +26,7 @@ docs/
 2. Launch shared infrastructure with `docker compose up -d ingestion-db qdrant ingestion-service orchestrator-service ui-service` (brings up Postgres, Qdrant, ingestion/vector API, orchestrator, and the Next.js UI). Ensure `./data/pg19` contains PG-19 texts and `./data/orchestrator` exists for trace persistence.
 3. Install per-service dependencies (see each service README) and run them individually during development.
 4. Use `.env` files per service (templates provided inside each service directory) to configure Postgres, Qdrant/Chroma, Neo4j, and the Ollama base URL.
+   - If Ollama runs on the host while services run in Docker, point `*_OLLAMA_BASE_URL` at `http://host.docker.internal:11434` (the compose file already does this) so containers can reach it.
 
 ### Exporting PG-19 from Hugging Face shards
 

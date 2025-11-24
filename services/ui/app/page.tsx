@@ -183,6 +183,9 @@ export default function HomePage() {
 
     try {
       await streamChat(question, (event) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[streamChat:event]', event)
+        }
         if (event.type === 'step' && event.payload) {
           updateTrace(localId, event.payload as TraceStep)
         } else if (event.type === 'final' && event.payload) {
@@ -215,6 +218,7 @@ export default function HomePage() {
         }
       })
     } catch (err) {
+      console.error('[streamChat] failed', err)
       setTurns((prev) =>
         prev.map((turn) =>
           turn.id === localId

@@ -44,7 +44,7 @@ Environment variables (prefix `INGESTION_`) control runtime settings (see `.env.
 | `VECTOR_PORT` | Qdrant REST port | `6333` |
 | `VECTOR_COLLECTION` | Qdrant collection name | `pg19_chunks` |
 | `RAG_TOP_K` | Default top-k for `/rag/query` | `5` |
-| `OLLAMA_BASE_URL` | Base URL for Ollama runtime | `http://localhost:11434` |
+| `OLLAMA_BASE_URL` | Base URL for Ollama runtime | `http://localhost:11434` (Docker: `http://host.docker.internal:11434`) |
 
 > When running via Docker Compose the service overrides DB + vector env vars to talk to the `ingestion-db` (Postgres) and `qdrant` containers and maps `INGESTION_PG19_ROOT` to `/data/pg19` (mounted from `./data/pg19`).
 

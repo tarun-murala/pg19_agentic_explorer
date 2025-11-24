@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import textwrap
 from typing import Tuple
 
@@ -25,9 +26,7 @@ Chunk metadata:
 - Chunk index: {chunk_index}
 
 Chunk content:
-"""
 {chunk}
-"""
 
 Respond with ONLY the JSON.
 """
@@ -37,13 +36,20 @@ class KGExtractor:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.client = LLMClient(base_url=self.settings.ollama_base_url)
+        self.logger = logging.getLogger("kg_builder.extractor")
 
-    def extract(self, *, chunk_content: str, book_title: str | None, chunk_index: int | None) -> Tuple[list[Entity], list[Relation]]:
+    def extract(
+        self, *, chunk_content: str, book_title: str | None, chunk_index: int | None, trace_id: str | None = None
+    ) -> Tuple[list[Entity], list[Relation]]:
         prompt = _PROMPT_TEMPLATE.format(
             max_entities=self.settings.max_entities,
             book_title=book_title or "Unknown",
             chunk_index=chunk_index if chunk_index is not None else "Unknown",
             chunk=textwrap.dedent(chunk_content).strip(),
+        )
+        self.logger.info(
+            "LLM extract call",
+            extra={"trace_id": trace_id, "book_title": book_title, "chunk_index": chunk_index},
         )
         response = self.client.generate(
             LLMRequest(
@@ -56,6 +62,14 @@ class KGExtractor:
         data = self._parse_json(response.output)
         entities = [Entity(**item) for item in data.get("entities", [])]
         relations = [Relation(**item) for item in data.get("relations", [])]
+        self.logger.info(
+            "LLM extract parsed",
+            extra={
+                "trace_id": trace_id,
+                "entities": len(entities),
+                "relations": len(relations),
+            },
+        )
         return entities, relations
 
     def _parse_json(self, text: str) -> dict:

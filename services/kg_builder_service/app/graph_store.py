@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Iterable, List
 
 from neo4j import GraphDatabase, Transaction
@@ -15,12 +16,32 @@ class GraphStore:
             self.settings.neo4j_uri,
             auth=(self.settings.neo4j_user, self.settings.neo4j_password),
         )
+        self.logger = logging.getLogger("kg_builder.graph")
 
     def close(self) -> None:
         self._driver.close()
 
-    def upsert(self, *, book_id: int, book_title: str | None, chunk_id: int, chunk_index: int | None,
-               entities: List[Entity], relations: List[Relation]) -> None:
+    def upsert(
+        self,
+        *,
+        book_id: int,
+        book_title: str | None,
+        chunk_id: int,
+        chunk_index: int | None,
+        entities: List[Entity],
+        relations: List[Relation],
+        trace_id: str | None = None,
+    ) -> None:
+        self.logger.info(
+            "graph upsert start",
+            extra={
+                "trace_id": trace_id,
+                "book_id": book_id,
+                "chunk_id": chunk_id,
+                "entities": len(entities),
+                "relations": len(relations),
+            },
+        )
         with self._driver.session() as session:
             session.execute_write(
                 self._write_graph,
@@ -31,6 +52,7 @@ class GraphStore:
                 [entity.dict() for entity in entities],
                 [relation.dict() for relation in relations],
             )
+        self.logger.info("graph upsert complete", extra={"trace_id": trace_id, "chunk_id": chunk_id})
 
     @staticmethod
     def _write_graph(
@@ -94,10 +116,22 @@ class GraphStore:
                 book_id=book_id,
             )
 
-    def query(self, *, book_id: int | None = None, chunk_id: int | None = None) -> KGQueryResponse:
+    def query(
+        self, *, book_id: int | None = None, chunk_id: int | None = None, trace_id: str | None = None
+    ) -> KGQueryResponse:
         with self._driver.session() as session:
             entities = session.execute_read(self._fetch_entities, book_id, chunk_id)
             relations = session.execute_read(self._fetch_relations, book_id, chunk_id)
+        self.logger.info(
+            "graph query complete",
+            extra={
+                "trace_id": trace_id,
+                "book_id": book_id,
+                "chunk_id": chunk_id,
+                "entities": len(entities),
+                "relations": len(relations),
+            },
+        )
         return KGQueryResponse(book_id=book_id, chunk_id=chunk_id, entities=entities, relations=relations)
 
     @staticmethod
